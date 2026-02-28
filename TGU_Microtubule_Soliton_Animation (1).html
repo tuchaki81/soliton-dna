@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TGU — Microtubule Coherence & Topological Solitons</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
+
+:root {
+  --bg: #06080e;
+  --bg2: #0a0d16;
+  --cyan: #00e5ff;
+  --cyan-dim: rgba(0,229,255,0.12);
+  --amber: #ff9100;
+  --amber-glow: #ffab40;
+  --violet: #7c4dff;
+  --text: #8e99a4;
+  --text-bright: #cfd8dc;
+  --border: rgba(0,229,255,0.08);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#header {
+  padding: 14px 24px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+#header h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-bright);
+  letter-spacing: 2px;
+}
+
+#header .sub {
+  font-size: 9.5px;
+  color: var(--cyan);
+  margin-top: 3px;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
+}
+
+#controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+#controls button {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 9.5px;
+  padding: 5px 12px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: all 0.2s;
+}
+
+#controls button:hover {
+  background: rgba(0,229,255,0.08);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+#controls button.active {
+  background: rgba(0,229,255,0.1);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+#phase-bar {
+  display: flex;
+  gap: 3px;
+  padding: 8px 24px;
+  flex-shrink: 0;
+}
+
+.phase-segment {
+  flex: 1;
+  height: 2px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 1px;
+  transition: background 0.6s ease;
+}
+
+.phase-segment.active-cyan { background: var(--cyan); }
+.phase-segment.active-amber { background: var(--amber); }
+
+#phase-info {
+  padding: 0 24px 10px;
+  flex-shrink: 0;
+}
+
+#phase-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cyan);
+  letter-spacing: 0.8px;
+  transition: color 0.4s;
+}
+
+#phase-desc {
+  font-size: 9.5px;
+  color: rgba(142,153,164,0.55);
+  margin-top: 3px;
+  line-height: 1.6;
+  max-width: 800px;
+}
+
+#canvas-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#footer {
+  padding: 8px 24px;
+  display: flex;
+  gap: 20px;
+  font-size: 9.5px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  align-items: center;
+}
+
+#footer .metric-key { color: rgba(142,153,164,0.35); }
+#footer .metric-val { color: var(--text-bright); font-weight: 600; }
+#footer .metric-val.glow-cyan { color: var(--cyan); }
+#footer .metric-val.glow-amber { color: var(--amber-glow); }
+#footer .right { margin-left: auto; color: rgba(142,153,164,0.2); }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div>
+    <h1>TGU — INFORMATIONAL SPIN COHERENCE</h1>
+    <div class="sub">Microtubule Synchronization → Soliton Formation → Topological Protection</div>
+  </div>
+  <div id="controls">
+    <button id="btn-pause" onclick="togglePause()">❚❚ PAUSE</button>
+    <button onclick="restart()">↺ RESTART</button>
+  </div>
+</div>
+
+<div id="phase-bar">
+  <div class="phase-segment" id="seg0"></div>
+  <div class="phase-segment" id="seg1"></div>
+  <div class="phase-segment" id="seg2"></div>
+  <div class="phase-segment" id="seg3"></div>
+  <div class="phase-segment" id="seg4"></div>
+</div>
+
+<div id="phase-info">
+  <div id="phase-label">PHASE 0: Incoherent Oscillators</div>
+  <div id="phase-desc">Each tubulin dimer oscillates at its own natural frequency ωᵢ. No collective order emerges. Φ ≈ 0. ICOER negligible.</div>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="footer">
+  <div><span class="metric-key">Φ = </span><span class="metric-val glow-cyan" id="m-phi">0.0000</span></div>
+  <div><span class="metric-key">n = </span><span class="metric-val">60 dimers</span></div>
+  <div><span class="metric-key">C = </span><span class="metric-val">13×8 ≈ 104</span></div>
+  <div><span class="metric-key">exp = </span><span class="metric-val">12 (2p, p=6)</span></div>
+  <div><span class="metric-key">Q = </span><span class="metric-val glow-amber" id="m-q">0</span></div>
+  <div class="right">H. Matuchaki — TGU 2026</div>
+</div>
+
+<script>
+const TAU = Math.PI * 2;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// ── Simulation ──
+const N = 60;
+let theta = new Float64Array(N);
+let omega = new Float64Array(N);
+let phiHistory = [];
+let paused = false;
+
+let phase = 0, phaseTime = 0, globalTime = 0;
+let coupling = 0.5, noise = 2.0, Phi = 0;
+let solAmp = 0, solPhase = 0, topoQ = 0, qAccum = 0;
+
+const PHASE_LABELS = [
+  "Incoherent Oscillators",
+  "Kuramoto Synchronization",
+  "Supracritical Coherence (Φ > Φ_c)",
+  "Soliton Formation (γ > λ)",
+  "Topologically Protected Soliton (Q ≠ 0)"
+];
+const PHASE_DESCS = [
+  "Each tubulin dimer oscillates at its own natural frequency ωᵢ. No collective order. Φ ≈ 0. ICOER negligible.",
+  "Coupling ε increases between dimers. Phases begin to align. The Kuramoto order parameter Φ rises toward the critical threshold Φ_c.",
+  "Φ exceeds Φ_c. The MT↔DNA loop operates coherently. ICOER = n·C·ε¹²·exp(−S)·Γ becomes significant. Informational imprint Ψ accumulates.",
+  "Self-coherence rate γ exceeds dissipation λ. The field equation admits a solitonic solution. The coherence pattern localizes into a self-sustained pulse.",
+  "Topological charge Q = (1/2π)∮∇θ·dl ≠ 0. The soliton is indestructible by continuous perturbations. Persistence Theorem conditions satisfied."
+];
+const DURATIONS = [4, 6.5, 5, 5.5, 8];
+
+function resetSim() {
+  for (let i = 0; i < N; i++) {
+    theta[i] = Math.random() * TAU;
+    omega[i] = 0.8 + Math.random() * 0.4;
+  }
+  phiHistory = [];
+  phase = 0; phaseTime = 0; globalTime = 0;
+  coupling = 0.5; noise = 2.0; Phi = 0;
+  solAmp = 0; solPhase = 0; topoQ = 0; qAccum = 0;
+  updateUI();
+}
+
+function stepSim(dt) {
+  const dth = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    let sum = 0;
+    for (let j = 0; j < N; j++) {
+      if (i === j) continue;
+      const d = Math.abs(i - j);
+      const eps = 1 / Math.pow(1 + (d / 8) ** 2, 6);
+      sum += eps * Math.sin(theta[j] - theta[i]);
+    }
+    dth[i] = omega[i] + (coupling / N) * sum + noise * (Math.random() - 0.5);
+  }
+  for (let i = 0; i < N; i++) {
+    theta[i] = ((theta[i] + dth[i] * dt) % TAU + TAU) % TAU;
+  }
+}
+
+function getOrderParam() {
+  let cx = 0, cy = 0;
+  for (let i = 0; i < N; i++) { cx += Math.cos(theta[i]); cy += Math.sin(theta[i]); }
+  return Math.sqrt(cx * cx + cy * cy) / N;
+}
+
+function getLocalCoh(i, w) {
+  let cx = 0, cy = 0, c = 0;
+  for (let j = Math.max(0, i - w); j <= Math.min(N - 1, i + w); j++) {
+    cx += Math.cos(theta[j]); cy += Math.sin(theta[j]); c++;
+  }
+  return Math.sqrt(cx * cx + cy * cy) / c;
+}
+
+function solitonProfile(x, center, width) {
+  return 1 / (1 + Math.exp(-(x - center) / width));
+}
+
+function updateUI() {
+  for (let i = 0; i < 5; i++) {
+    const seg = document.getElementById('seg' + i);
+    seg.className = 'phase-segment';
+    if (i <= phase) seg.classList.add(i < 3 ? 'active-cyan' : 'active-amber');
+  }
+  const lbl = document.getElementById('phase-label');
+  lbl.textContent = `PHASE ${phase}: ${PHASE_LABELS[phase]}`;
+  lbl.style.color = phase < 3 ? 'var(--cyan)' : 'var(--amber-glow)';
+  document.getElementById('phase-desc').textContent = PHASE_DESCS[phase];
+}
+
+function togglePause() {
+  paused = !paused;
+  const btn = document.getElementById('btn-pause');
+  btn.textContent = paused ? '▶ PLAY' : '❚❚ PAUSE';
+  btn.classList.toggle('active', paused);
+}
+
+function restart() {
+  resetSim();
+  paused = false;
+  document.getElementById('btn-pause').textContent = '❚❚ PAUSE';
+  document.getElementById('btn-pause').classList.remove('active');
+}
+
+// ── Drawing ──
+function draw() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const W = rect.width, H = rect.height;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const dt = 0.016;
+  if (!paused) {
+    globalTime += dt;
+    phaseTime += dt;
+
+    // Phase transitions
+    if (phaseTime > DURATIONS[phase]) {
+      if (phase < 4) { phase++; phaseTime = 0; updateUI(); }
+      else { resetSim(); }
+    }
+
+    // Coupling/noise schedule
+    if (phase === 0) { coupling = 0.5; noise = 2.0; }
+    else if (phase === 1) { coupling = 0.5 + phaseTime * 3.2; noise = Math.max(0.4, 2.0 - phaseTime * 0.25); }
+    else { coupling = 28; noise = 0.25; }
+
+    stepSim(dt);
+
+    if (phase === 3) { solAmp = Math.min(1, phaseTime / 4); qAccum += dt * 0.35; topoQ = Math.floor(qAccum); }
+    else if (phase === 4) { solAmp = 1; qAccum += dt * 0.18; topoQ = Math.floor(qAccum); }
+    solPhase += dt * 1.5;
+  }
+
+  Phi = getOrderParam();
+  phiHistory.push(Phi);
+  if (phiHistory.length > 350) phiHistory.shift();
+
+  // Update footer
+  const phiEl = document.getElementById('m-phi');
+  phiEl.textContent = Phi.toFixed(4);
+  phiEl.className = 'metric-val ' + (Phi > 0.6 ? 'glow-amber' : 'glow-cyan');
+  document.getElementById('m-q').textContent = topoQ;
+
+  // ── Background ──
+  ctx.fillStyle = '#06080e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle radial atmosphere
+  const bgGrd = ctx.createRadialGradient(W * 0.5, H * 0.3, 0, W * 0.5, H * 0.3, W * 0.6);
+  bgGrd.addColorStop(0, 'rgba(0,229,255,0.015)');
+  bgGrd.addColorStop(1, 'transparent');
+  ctx.fillStyle = bgGrd;
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(0,229,255,0.025)';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x < W; x += 50) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 50) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  // ═══ MICROTUBULE HELIX ═══
+  const mtCX = W * 0.5, mtCY = H * 0.26;
+  const mtLen = W * 0.78;
+  const mtX0 = mtCX - mtLen / 2;
+  const helixR = Math.min(32, H * 0.06);
+
+  // Helix backbone strands
+  for (let s = 0; s < 2; s++) {
+    ctx.beginPath();
+    ctx.strokeStyle = s === 0 ? 'rgba(0,229,255,0.35)' : 'rgba(124,77,255,0.28)';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i <= 250; i++) {
+      const t = i / 250;
+      const x = mtX0 + t * mtLen;
+      const a = t * TAU * 4.5 + s * Math.PI + globalTime * 0.25;
+      const y = mtCY + Math.sin(a) * helixR;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // Rungs (hydrogen bonds)
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < 45; i++) {
+    const t = (i + 0.5) / 45;
+    const a = t * TAU * 4.5 + globalTime * 0.25;
+    const x = mtX0 + t * mtLen;
+    const y1 = mtCY + Math.sin(a) * helixR;
+    const y2 = mtCY + Math.sin(a + Math.PI) * helixR;
+    ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, y2); ctx.stroke();
+  }
+
+  // ── Tubulin Dimers ──
+  for (let i = 0; i < N; i++) {
+    const t = (i + 0.5) / N;
+    const x = mtX0 + t * mtLen;
+    const a = t * TAU * 4.5 + globalTime * 0.25;
+    const y = mtCY + Math.sin(a) * helixR;
+    const z = Math.cos(a);
+
+    const lc = getLocalCoh(i, 4);
+    const ph = theta[i];
+    const hue = (ph / TAU) * 360;
+    const sat = 55 + lc * 45;
+    const lum = 25 + lc * 45;
+    const r = 3.5 + lc * 4.5 + z * 2;
+
+    // Coherence glow
+    if (lc > 0.55) {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r * 4);
+      g.addColorStop(0, `hsla(${hue},${sat}%,${lum}%,${0.15 + lc * 0.2})`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, r * 4, 0, TAU); ctx.fill();
+    }
+
+    // Body
+    ctx.fillStyle = `hsl(${hue},${sat}%,${lum}%)`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+
+    // Subtle border
+    ctx.strokeStyle = `hsla(${hue},70%,60%,0.3)`;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Phase arrow
+    ctx.strokeStyle = `hsla(${hue},90%,75%,0.6)`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(ph) * r * 1.8, y + Math.sin(ph) * r * 1.8);
+    ctx.stroke();
+  }
+
+  // ═══ EQUATIONS LINE ═══
+  ctx.fillStyle = 'rgba(142,153,164,0.4)';
+  ctx.font = '10px "IBM Plex Mono", monospace';
+  const eqY = H * 0.47;
+  if (phase <= 1) {
+    ctx.fillText(`dθᵢ/dt = ωᵢ + (ε/n)Σⱼ sin(θⱼ−θᵢ) − σξᵢ(t)          ε = 1/(1+r²)⁶   coupling = ${coupling.toFixed(1)}   noise = ${noise.toFixed(2)}`, 20, eqY);
+  } else if (phase === 2) {
+    ctx.fillText(`ICOER = n × C × ε¹² × exp(−S) × Γ          Φ = ${Phi.toFixed(3)}  >  Φ_c = 0.600  ✓ SUPRACRITICAL`, 20, eqY);
+  } else {
+    ctx.fillText(`∂ℐ/∂t + v·∂ℐ/∂x = −λℐ + γℐ(1−ℐ/ℐ_max)          γ > λ ✓   Ψ₀ > Ψ_c ✓   Q = ${topoQ} ${topoQ > 0 ? '✓ PROTECTED' : '...'}`, 20, eqY);
+  }
+
+  // ═══ SOLITON PANEL (bottom-left) ═══
+  if (phase >= 3) {
+    const sx = W * 0.04, sy = H * 0.54, sw = W * 0.44, sh = H * 0.36;
+
+    // Panel bg
+    ctx.fillStyle = 'rgba(255,145,0,0.02)';
+    ctx.fillRect(sx, sy, sw, sh);
+    ctx.strokeStyle = `rgba(255,145,0,${0.12 + solAmp * 0.18})`;
+    ctx.lineWidth = 0.8;
+    ctx.strokeRect(sx, sy, sw, sh);
+
+    // Label
+    ctx.fillStyle = 'rgba(255,145,0,0.7)';
+    ctx.font = 'bold 10px "IBM Plex Mono", monospace';
+    ctx.fillText('SOLITON PROFILE  ℐ(ξ)', sx + 10, sy - 5);
+
+    // Axis
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(sx + 10, sy + sh - 12); ctx.lineTo(sx + sw - 10, sy + sh - 12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx + 10, sy + 10); ctx.lineTo(sx + 10, sy + sh - 12); ctx.stroke();
+
+    // ξ and ℐ labels
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.font = '9px "IBM Plex Mono", monospace';
+    ctx.fillText('ξ →', sx + sw - 35, sy + sh - 2);
+    ctx.save();
+    ctx.translate(sx + 4, sy + sh * 0.4);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('ℐ(ξ) →', 0, 0);
+    ctx.restore();
+
+    // Soliton curve
+    const sc = sw * 0.5;
+    const swidth = sw * 0.07 / (0.4 + solAmp * 0.6);
+
+    // Fill under curve
+    ctx.beginPath();
+    for (let px = 0; px < sw - 20; px++) {
+      const xi = px - sc;
+      const val = solAmp * solitonProfile(xi, 0, swidth);
+      const cx2 = sx + 10 + px;
+      const cy2 = sy + sh - 14 - val * (sh - 28) * 0.88;
+      if (px === 0) ctx.moveTo(cx2, cy2); else ctx.lineTo(cx2, cy2);
+    }
+    ctx.lineTo(sx + sw - 10, sy + sh - 14);
+    ctx.lineTo(sx + 10, sy + sh - 14);
+    ctx.closePath();
+    const fgrd = ctx.createLinearGradient(sx, sy, sx, sy + sh);
+    fgrd.addColorStop(0, `rgba(255,171,64,${0.12 * solAmp})`);
+    fgrd.addColorStop(1, 'rgba(255,145,0,0.01)');
+    ctx.fillStyle = fgrd;
+    ctx.fill();
+
+    // Curve stroke
+    ctx.beginPath();
+    for (let px = 0; px < sw - 20; px++) {
+      const xi = px - sc;
+      const val = solAmp * solitonProfile(xi, 0, swidth);
+      const cx2 = sx + 10 + px;
+      const cy2 = sy + sh - 14 - val * (sh - 28) * 0.88;
+      if (px === 0) ctx.moveTo(cx2, cy2); else ctx.lineTo(cx2, cy2);
+    }
+    const lgrd = ctx.createLinearGradient(sx, sy, sx, sy + sh);
+    lgrd.addColorStop(0, '#ffab40');
+    lgrd.addColorStop(1, '#ff6d00');
+    ctx.strokeStyle = lgrd;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Traveling energy pulse
+    if (phase === 4) {
+      const px2 = ((globalTime * 50) % (sw - 20));
+      const xi = px2 - sc;
+      const val = solitonProfile(xi, 0, swidth);
+      const pX = sx + 10 + px2;
+      const pY = sy + sh - 14 - val * (sh - 28) * 0.88;
+      const pg = ctx.createRadialGradient(pX, pY, 0, pX, pY, 20);
+      pg.addColorStop(0, 'rgba(255,171,64,0.5)');
+      pg.addColorStop(1, 'transparent');
+      ctx.fillStyle = pg;
+      ctx.beginPath(); ctx.arc(pX, pY, 20, 0, TAU); ctx.fill();
+    }
+
+    // Equation
+    ctx.fillStyle = 'rgba(255,145,0,0.45)';
+    ctx.font = '9px "IBM Plex Mono", monospace';
+    ctx.fillText('ℐ(ξ) = [(γ−λ)ℐ_max/γ]·1/[1+Ae^{-(γ−λ)ξ/u}]', sx + 12, sy + sh - 2);
+
+    // Condition box
+    ctx.fillStyle = 'rgba(255,145,0,0.06)';
+    ctx.fillRect(sx + sw - 120, sy + 8, 112, 36);
+    ctx.fillStyle = 'rgba(255,171,64,0.6)';
+    ctx.font = 'bold 9px "IBM Plex Mono", monospace';
+    ctx.fillText('EXISTENCE:', sx + sw - 114, sy + 20);
+    ctx.font = '10px "IBM Plex Mono", monospace';
+    ctx.fillStyle = '#ffab40';
+    ctx.fillText('γ > λ  ✓', sx + sw - 114, sy + 36);
+  }
+
+  // ═══ Φ HISTORY (bottom-right) ═══
+  const px0 = W * 0.52, py0 = H * 0.54, pw = W * 0.44, ph2 = H * 0.36;
+
+  ctx.fillStyle = 'rgba(0,229,255,0.015)';
+  ctx.fillRect(px0, py0, pw, ph2);
+  ctx.strokeStyle = 'rgba(0,229,255,0.12)';
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(px0, py0, pw, ph2);
+
+  ctx.fillStyle = 'rgba(0,229,255,0.7)';
+  ctx.font = 'bold 10px "IBM Plex Mono", monospace';
+  ctx.fillText('ORDER PARAMETER  Φ(t)', px0 + 10, py0 - 5);
+
+  // Axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(px0 + 10, py0 + ph2 - 12); ctx.lineTo(px0 + pw - 10, py0 + ph2 - 12); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px0 + 10, py0 + 10); ctx.lineTo(px0 + 10, py0 + ph2 - 12); ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.font = '9px "IBM Plex Mono", monospace';
+  ctx.fillText('t →', px0 + pw - 30, py0 + ph2 - 2);
+
+  // Y scale marks
+  for (let v = 0; v <= 1; v += 0.2) {
+    const yy = py0 + ph2 - 14 - v * (ph2 - 28) * 0.9;
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillText(v.toFixed(1), px0 + 14, yy + 3);
+    ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+    ctx.beginPath(); ctx.moveTo(px0 + 35, yy); ctx.lineTo(px0 + pw - 10, yy); ctx.stroke();
+  }
+
+  // Φ_c threshold
+  const phiC = 0.6;
+  const critY = py0 + ph2 - 14 - phiC * (ph2 - 28) * 0.9;
+  ctx.setLineDash([5, 4]);
+  ctx.strokeStyle = 'rgba(255,145,0,0.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px0 + 10, critY); ctx.lineTo(px0 + pw - 10, critY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,145,0,0.5)';
+  ctx.font = '9px "IBM Plex Mono", monospace';
+  ctx.fillText('Φ_c', px0 + pw - 26, critY - 4);
+
+  // Plot
+  if (phiHistory.length > 1) {
+    ctx.beginPath();
+    for (let i = 0; i < phiHistory.length; i++) {
+      const x2 = px0 + 36 + (i / 350) * (pw - 46);
+      const y2 = py0 + ph2 - 14 - phiHistory[i] * (ph2 - 28) * 0.9;
+      if (i === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
+    }
+    const plGrd = ctx.createLinearGradient(px0, 0, px0 + pw, 0);
+    plGrd.addColorStop(0, 'rgba(0,229,255,0.2)');
+    plGrd.addColorStop(1, '#00e5ff');
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    // Glow fill under Φ curve
+    ctx.lineTo(px0 + 36 + ((phiHistory.length - 1) / 350) * (pw - 46), py0 + ph2 - 14);
+    ctx.lineTo(px0 + 36, py0 + ph2 - 14);
+    ctx.closePath();
+    const fg2 = ctx.createLinearGradient(px0, py0, px0, py0 + ph2);
+    fg2.addColorStop(0, 'rgba(0,229,255,0.06)');
+    fg2.addColorStop(1, 'transparent');
+    ctx.fillStyle = fg2;
+    ctx.fill();
+
+    // Current dot
+    const lastP = phiHistory[phiHistory.length - 1];
+    const dotX = px0 + 36 + ((phiHistory.length - 1) / 350) * (pw - 46);
+    const dotY = py0 + ph2 - 14 - lastP * (ph2 - 28) * 0.9;
+    ctx.beginPath(); ctx.arc(dotX, dotY, 4, 0, TAU);
+    ctx.fillStyle = lastP > phiC ? '#ffab40' : '#00e5ff';
+    ctx.fill();
+
+    // Dot glow
+    const dg = ctx.createRadialGradient(dotX, dotY, 0, dotX, dotY, 12);
+    dg.addColorStop(0, lastP > phiC ? 'rgba(255,171,64,0.3)' : 'rgba(0,229,255,0.3)');
+    dg.addColorStop(1, 'transparent');
+    ctx.fillStyle = dg;
+    ctx.beginPath(); ctx.arc(dotX, dotY, 12, 0, TAU); ctx.fill();
+  }
+
+  // ═══ TOPOLOGICAL CHARGE INDICATOR ═══
+  if (phase >= 3 && topoQ > 0) {
+    const tcx = W - 75, tcy = H * 0.22, tr = 28;
+
+    // Ring
+    ctx.strokeStyle = `rgba(255,145,0,${0.2 + 0.15 * Math.sin(globalTime * 2)})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(tcx, tcy, tr + 5, 0, TAU); ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,145,0,0.04)';
+    ctx.beginPath(); ctx.arc(tcx, tcy, tr + 5, 0, TAU); ctx.fill();
+
+    // Winding dots
+    const nw = Math.min(topoQ, 8);
+    for (let w = 0; w < nw; w++) {
+      const wa = solPhase * 2 + (w / nw) * TAU;
+      const wx = tcx + Math.cos(wa) * tr;
+      const wy = tcy + Math.sin(wa) * tr;
+      const intensity = 0.4 + 0.6 * ((Math.sin(wa) + 1) / 2);
+      ctx.fillStyle = `rgba(255,171,64,${intensity})`;
+      ctx.beginPath(); ctx.arc(wx, wy, 2.5, 0, TAU); ctx.fill();
+
+      // Trail
+      for (let t = 1; t <= 3; t++) {
+        const ta = wa - t * 0.15;
+        ctx.fillStyle = `rgba(255,171,64,${intensity * 0.15 / t})`;
+        ctx.beginPath();
+        ctx.arc(tcx + Math.cos(ta) * tr, tcy + Math.sin(ta) * tr, 2, 0, TAU);
+        ctx.fill();
+      }
+    }
+
+    // Q value in center
+    ctx.fillStyle = '#ffab40';
+    ctx.font = 'bold 16px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(topoQ, tcx, tcy + 5);
+    ctx.font = '8px "IBM Plex Mono", monospace';
+    ctx.fillStyle = 'rgba(255,171,64,0.5)';
+    ctx.fillText('Q ∈ ℤ', tcx, tcy + 18);
+    ctx.fillText('∮∇θ·dl/2π', tcx, tcy + tr + 20);
+    ctx.textAlign = 'left';
+  }
+
+  // ═══ γ > λ condition badge ═══
+  if (phase >= 3) {
+    const bx = 20, by = H * 0.52 - 22;
+    ctx.fillStyle = 'rgba(255,145,0,0.06)';
+    ctx.fillRect(bx, by, 160, 16);
+    ctx.strokeStyle = 'rgba(255,145,0,0.2)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(bx, by, 160, 16);
+    ctx.fillStyle = 'rgba(255,171,64,0.7)';
+    ctx.font = '9px "IBM Plex Mono", monospace';
+    ctx.fillText('γ > λ  |  Ψ₀ > Ψ_c  |  Q ≠ 0', bx + 6, by + 11);
+  }
+
+  requestAnimationFrame(draw);
+}
+
+resetSim();
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
